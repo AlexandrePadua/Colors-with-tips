@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-visual">
+    <meta name="theme-color" content="#FFF6E5">
+    <meta name="color-scheme" content="light only">
+    <meta name="description" content="Pitacor: adivinhe a cor pela dica! Jogo de festa para jogar com amigos no navegador, no PC ou no celular.">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Pitacor">
+    <meta name="format-detection" content="telephone=no">
+    <title>Pitacor</title>
+    <link rel="icon" type="image/svg+xml" href="TemplateData/favicon.svg">
+    <link rel="stylesheet" href="TemplateData/style.css">
+    <link rel="preload" href="Build/cc0520a1cdb6c7f17e1842c8dccce44e.loader.js" as="script">
+  </head>
+  <body>
+    <div id="pc-page">
+      <div id="pc-row">
+        <!-- Desktop banner slots (outside the canvas, GDD 11). Hidden until ads are enabled. -->
+        <aside id="pc-ad-left" class="pc-ad pc-hidden" aria-label="Publicidade"></aside>
+        <main id="pc-stage">
+          <div id="unity-container">
+            <canvas id="unity-canvas" tabindex="-1" aria-label="Pitacor"></canvas>
+          </div>
+        </main>
+        <aside id="pc-ad-right" class="pc-ad pc-hidden" aria-label="Publicidade"></aside>
+      </div>
+      <!-- Donation slot ("Apoie"). Hidden for now. -->
+      <footer id="pc-footer" class="pc-hidden">
+        <a id="pc-donate" class="pc-donate" href="#" target="_blank" rel="noopener">Apoie o Pitacor <span aria-hidden="true">&#9829;</span></a>
+      </footer>
+    </div>
+
+    <div id="pc-loader" role="status" aria-live="polite">
+      <div class="pc-splats" aria-hidden="true">
+        <i class="pc-splat pc-s1"></i><i class="pc-splat pc-s2"></i><i class="pc-splat pc-s3"></i>
+        <i class="pc-splat pc-s4"></i><i class="pc-splat pc-s5"></i><i class="pc-splat pc-s6"></i>
+        <i class="pc-drop pc-d1"></i><i class="pc-drop pc-d2"></i><i class="pc-drop pc-d3"></i><i class="pc-drop pc-d4"></i>
+      </div>
+      <div class="pc-center">
+        <h1 class="pc-logo" aria-label="Pitacor">
+          <span class="pc-l" style="--i:0;--c:var(--pc-orange);--r:-6deg"><b>P</b></span><span class="pc-l" style="--i:1;--c:var(--pc-amber);--r:4deg"><b>I</b></span><span class="pc-l" style="--i:2;--c:var(--pc-sky);--r:-3deg"><b>T</b></span><span class="pc-l" style="--i:3;--c:var(--pc-mint);--r:5deg"><b>A</b></span><span class="pc-l" style="--i:4;--c:var(--pc-pink);--r:-4deg"><b>C</b></span><span class="pc-l" style="--i:5;--c:var(--pc-violet);--r:3deg"><b>O</b></span><span class="pc-l" style="--i:6;--c:var(--pc-orange);--r:-5deg"><b>R</b></span>
+        </h1>
+        <div class="pc-progress">
+          <div class="pc-bar" role="progressbar" aria-label="Carregando" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div class="pc-bar-fill"></div>
+          </div>
+          <div class="pc-status"><span class="pc-status-text">Carregando</span> <span class="pc-percent">0%</span></div>
+        </div>
+        <p class="pc-tip"><span class="pc-tip-text">Misturando as tintas&hellip;</span></p>
+        <div class="pc-error pc-hidden" role="alert">
+          <div class="pc-error-badge" aria-hidden="true">!</div>
+          <h2 class="pc-error-title">Ops! A tinta derramou.</h2>
+          <p class="pc-error-msg">Não conseguimos carregar o jogo.</p>
+          <button type="button" class="pc-btn" id="pc-retry">Tentar de novo</button>
+          <details class="pc-error-details">
+            <summary>Detalhes técnicos</summary>
+            <pre class="pc-error-raw"></pre>
+          </details>
+        </div>
+      </div>
+    </div>
+
+    <noscript>
+      <div class="pc-noscript">O Pitacor precisa de JavaScript ligado para funcionar.</div>
+    </noscript>
+
+    <script>
+      (function () {
+        'use strict';
+
+        var canvas = document.getElementById('unity-canvas');
+        var loader = document.getElementById('pc-loader');
+        var fill = loader.querySelector('.pc-bar-fill');
+        var bar = loader.querySelector('.pc-bar');
+        var percent = loader.querySelector('.pc-percent');
+        var statusText = loader.querySelector('.pc-status-text');
+        var tipText = loader.querySelector('.pc-tip-text');
+        var errorBox = loader.querySelector('.pc-error');
+        var reducedMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+        // ---------------------------------------------------------------- page hygiene (no zoom, bounce or menus)
+        var noDefault = function (e) { if (e.cancelable) e.preventDefault(); };
+        var nonPassive = { passive: false };
+        document.addEventListener('gesturestart', noDefault, nonPassive);   // iOS pinch-zoom of the page
+        document.addEventListener('gesturechange', noDefault, nonPassive);
+        document.addEventListener('dblclick', noDefault, nonPassive);       // double-tap zoom
+        canvas.addEventListener('touchmove', noDefault, nonPassive);        // scroll / pull-to-refresh
+        canvas.addEventListener('contextmenu', noDefault);
+        canvas.addEventListener('wheel', function (e) { if (e.ctrlKey) noDefault(e); }, nonPassive); // trackpad pinch
+
+        // ---------------------------------------------------------------- loading tips
+        var tips = [
+          'Dica: nada de nomes de cores!',
+          'Pense em coisas: “banana” diz mais que “amarelo”.',
+          'A 2ª dica pode ter até duas palavras.',
+          'Quem dá a dica pode pular a 2ª e ganhar bônus.',
+          'Quanto mais perto da cor, mais pontos.',
+          'Coordenadas como “K25” não valem como dica.',
+          'Chame a galera: mande o link da sala!',
+          'No celular, faça pinça para dar zoom no tabuleiro.',
+          'Cada tela mostra as cores um pouquinho diferente.'
+        ];
+        var flavor = ['Misturando as tintas…', 'Afinando os pincéis…', 'Esticando o papel…', 'Separando os potinhos de tinta…'];
+        var tipIndex = Math.floor(Math.random() * tips.length);
+        var tipTimer = 0;
+        function showTip(text) {
+          if (reducedMotion) { tipText.textContent = text; return; }
+          tipText.classList.add('pc-tip-out');
+          setTimeout(function () {
+            tipText.textContent = text;
+            tipText.classList.remove('pc-tip-out');
+          }, 220);
+        }
+        tipText.textContent = flavor[Math.floor(Math.random() * flavor.length)];
+        tipTimer = setInterval(function () {
+          tipIndex = (tipIndex + 1) % tips.length;
+          showTip(tips[tipIndex]);
+        }, 3800);
+
+        // ---------------------------------------------------------------- smoothed progress
+        var target = 0, shown = 0, rafId = 0, finishing = false;
+        function renderProgress() {
+          rafId = 0;
+          shown += (target - shown) * (reducedMotion ? 1 : 0.14);
+          if (Math.abs(target - shown) < 0.002) shown = target;
+          var pct = Math.round(shown * 100);
+          fill.style.width = (shown * 100).toFixed(2) + '%';
+          percent.textContent = pct + '%';
+          bar.setAttribute('aria-valuenow', String(pct));
+          if (shown !== target) rafId = requestAnimationFrame(renderProgress);
+        }
+        function setProgress(p) {
+          p = Math.max(0, Math.min(1, p || 0));
+          if (p <= target) return;
+          target = p;
+          // Unity reports ~0.9 when the download ends; the rest is compiling/booting, which has no progress.
+          if (p >= 0.9 && !finishing) {
+            finishing = true;
+            loader.classList.add('pc-finishing');
+            statusText.textContent = 'Quase lá';
+          }
+          if (!rafId) rafId = requestAnimationFrame(renderProgress);
+        }
+
+        // ---------------------------------------------------------------- errors
+        function friendlyMessage(raw) {
+          var m = String(raw || '');
+          if (/WebGL 2|does not support WebGL|WebGPU/i.test(m))
+            return 'Seu navegador não tem o WebGL 2 que o jogo precisa para desenhar o tabuleiro. Atualize o navegador (Chrome, Edge, Firefox ou Safari recentes) e tente de novo.';
+          if (/WebAssembly/i.test(m))
+            return 'Seu navegador é antigo demais para o jogo. Atualize-o e tente de novo.';
+          if (/memory|Cannot enlarge|allocate/i.test(m))
+            return 'Faltou memória no aparelho. Feche outras abas e aplicativos e tente de novo.';
+          if (/file:\/\//i.test(m))
+            return 'Abra o jogo por um servidor web (não direto do arquivo).';
+          if (/Unable to load|failed to fetch|NetworkError|network|HTTP|404/i.test(m))
+            return 'Não conseguimos baixar o jogo. Confira sua internet e tente de novo.';
+          return 'Algo deu errado ao carregar o jogo. Recarregar a página costuma resolver.';
+        }
+        var errorShown = false;
+        function showError(raw, title) {
+          if (errorShown) return;
+          errorShown = true;
+          clearInterval(tipTimer);
+          console.error('[Pitacor] ' + raw);
+          errorBox.querySelector('.pc-error-title').textContent = title || 'Ops! A tinta derramou.';
+          errorBox.querySelector('.pc-error-msg').textContent = friendlyMessage(raw);
+          errorBox.querySelector('.pc-error-raw').textContent = String(raw || '');
+          errorBox.classList.remove('pc-hidden');
+          loader.classList.remove('pc-hide', 'pc-done', 'pc-gone');
+          loader.classList.add('pc-failed');
+          loader.style.display = '';
+          var retry = document.getElementById('pc-retry');
+          retry.onclick = function () { window.location.reload(); };
+          setTimeout(function () { try { retry.focus({ preventScroll: true }); } catch (e) {} }, 400);
+        }
+        // Errors that kill the wasm runtime. Anything else is logged and ignored (never alert()).
+        function isFatal(message) {
+          return /RuntimeError|abort\(|unreachable|out of bounds|out of memory|Cannot enlarge memory|could not allocate|signature mismatch/i.test(String(message));
+        }
+
+        // ---------------------------------------------------------------- hide when the game says it is ready
+        var unityLoaded = false, readyRequested = false, hidden = false, fallbackTimer = 0;
+        function hideLoader() {
+          if (hidden || errorShown) return;
+          hidden = true;
+          clearTimeout(fallbackTimer);
+          setProgress(1);
+          loader.classList.add('pc-done');
+          setTimeout(function () {
+            loader.classList.add('pc-hide');
+            clearInterval(tipTimer);
+            setTimeout(function () {
+              if (errorShown) return;
+              loader.classList.add('pc-gone');
+              loader.style.display = 'none';
+              try { canvas.focus({ preventScroll: true }); } catch (e) {}
+            }, 520);
+          }, reducedMotion ? 0 : 380);
+        }
+        window['PitacorLoader'] = {
+          // Called by WebBridge.NotifyGameReady() once the first screen is built.
+          'ready': function () {
+            readyRequested = true;
+            if (unityLoaded) hideLoader();
+          },
+          'showError': function (message, title) { showError(message, title); },
+          'isVisible': function () { return !hidden; }
+        };
+
+        // ---------------------------------------------------------------- Unity
+        var buildUrl = 'Build';
+        var loaderUrl = buildUrl + '/cc0520a1cdb6c7f17e1842c8dccce44e.loader.js';
+        var config = {
+          arguments: [],
+          dataUrl: buildUrl + '/0f4ab64059c20421f10904a0e304d272.data.unityweb',
+          frameworkUrl: buildUrl + '/95c6bd8bb3bc8e7d6fd1d68073af6d0c.framework.js.unityweb',
+          codeUrl: buildUrl + '/c9ce9ac6d8da71f0910b13f6365eef6f.wasm.unityweb',
+          streamingAssetsUrl: 'StreamingAssets',
+          companyName: "Pitacor",
+          productName: "Pitacor",
+          productVersion: "0.2.0",
+          // Cap the backbuffer at 2x: sharp enough on phones, half the pixels of a 3x screen.
+          devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+          // Keep Application.persistentDataPath files across visits (IndexedDB).
+          autoSyncPersistentDataPath: true,
+          // Warnings go to the console (no banners over the game); errors show the friendly error box.
+          showBanner: function (msg, type) {
+            if (type === 'error') showError(msg);
+            else console.warn('[Unity] ' + msg);
+          },
+          // Uncaught JS errors after startup: never alert(); only fatal runtime errors show the error box.
+          errorHandler: function (message) {
+            if (isFatal(message)) showError(message, 'Ops! O jogo travou.');
+            else console.warn('[Pitacor] ignored error: ' + message);
+            return true;
+          }
+        };
+
+        var script = document.createElement('script');
+        script.src = loaderUrl;
+        script.onload = function () {
+          createUnityInstance(canvas, config, setProgress).then(function (unityInstance) {
+            window['pitacorUnity'] = unityInstance;
+            unityLoaded = true;
+            setProgress(1);
+            if (readyRequested) hideLoader();
+            else fallbackTimer = setTimeout(hideLoader, 1500);
+          }).catch(function (message) {
+            showError(message);
+          });
+        };
+        script.onerror = function () {
+          showError('Unable to load ' + loaderUrl);
+        };
+        document.body.appendChild(script);
+      })();
+    </script>
+  </body>
+</html>
